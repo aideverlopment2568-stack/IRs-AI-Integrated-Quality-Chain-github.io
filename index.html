@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Automated Book Generation</title>
+    
+    <!-- เรียกใช้ไฟล์ Local ตามที่ระบุในโฟลเดอร์เพื่อใช้งาน Offline -->
+    <script src="tailwindcss.js"></script>
+    <script src="sweetalert2.all.min.js"></script>
+    
+    <style>
+        /* ตกแต่ง Scrollbar ให้เข้ากับธีมสีเขียว */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #ecfdf5; border-radius: 4px; } /* สีเขียวอ่อนสุด */
+        ::-webkit-scrollbar-thumb { background: #6ee7b7; border-radius: 4px; } /* สีเขียวกลาง */
+        ::-webkit-scrollbar-thumb:hover { background: #10b981; } /* สีเขียวเข้มตอนโฮเวอร์ */
+        
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif, 'Sarabun'; }
+        .step-btn { transition: all 0.2s; }
+        .step-btn:hover { transform: translateX(5px); }
+        /* ปุ่มที่ถูกเลือกจะเป็นสีเขียวเข้ม */
+        .active-step { background-color: #059669 !important; color: white !important; font-weight: bold; border-color: #047857 !important; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-gray-50 overflow-hidden box-border">
+
+    <!-- ================= Header (ส่วนหัว) ================= -->
+    <header class="bg-emerald-700 shadow-md p-3 flex items-center gap-4 z-10 shrink-0 border-b-4 border-emerald-500">
+        <!-- โลโก้กระทรวงสาธารณสุข (รองรับลิงก์ออนไลน์ หากออฟไลน์จะใช้รูปสำรอง) -->
+        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Emblem_of_the_Ministry_of_Public_Health_of_Thailand.svg/200px-Emblem_of_the_Ministry_of_Public_Health_of_Thailand.svg.png" 
+             alt="MOPH Logo" 
+             class="h-14 w-14 object-contain bg-white rounded-full p-1 shadow-sm"
+             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI0VDRkRGNSIgc3Ryb2tlPSIjMDU5NjY5IiBzdHJva2Utd2lkdGg9IjUiLz48dGV4dCB4PSI1MCIgeT0iNTUiIGZvbnQtc2l6ZT0iMjQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMwNTk2NjkiPk1PUEg8L3RleHQ+PC9zdmc+'">
+        <h1 class="text-2xl font-bold text-white tracking-wide shadow-sm">นวัตกรรม AI ผู้ช่วยบริหารจัดการ IR สู่ QA </h1>
+    </header>
+
+    <!-- ================= Main Content ================= -->
+    <main class="flex-1 flex gap-4 p-4 overflow-hidden">
+        
+        <!-- ================= Sidebar (ซ้าย) ================= -->
+        <div class="w-1/4 bg-white rounded-xl shadow-md p-4 flex flex-col h-full border-t-4 border-emerald-500 shrink-0">
+            <h2 class="text-lg font-bold text-emerald-800 mb-4 text-center pb-2 border-b-2 border-emerald-100">
+                บริหารจัดการ IR มี 6 ขั้นตอน
+            </h2>
+
+            <!-- รายการปุ่ม 10 ขั้นตอน -->
+            <div id="stepContainer" class="flex flex-col gap-2 overflow-y-auto mb-4 flex-grow pr-2">
+                <!-- ปุ่มจะถูกสร้างอัตโนมัติด้วย JavaScript -->
+            </div>
+
+            <!-- ตั้งค่า Model และ Temperature -->
+            <div class="pt-4 border-t border-gray-200 bg-emerald-50 p-3 rounded-lg">
+                <label class="block text-sm font-bold text-emerald-800 mb-1">Model (LM Studio):</label>
+                <input type="text" id="modelName" value="gemma-4-e4b-it-qat" class="w-full border border-emerald-200 rounded p-1.5 mb-3 text-sm focus:ring-2 focus:ring-emerald-400 outline-none bg-white">
+                
+                <label class="block text-sm font-bold text-emerald-800 mb-1">Temperature (ความเป๊ะ):</label>
+                <div class="flex items-center gap-2">
+                    <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.3" class="w-full h-2 bg-emerald-200 rounded-lg appearance-none cursor-pointer accent-emerald-600">
+                    <div id="tempValue" class="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-1 rounded">0.3</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= Main Workspace (ขวา) ================= -->
+        <!-- เพิ่ม overflow-y-auto เพื่อให้ฝั่งขวาสามารถเลื่อนดูได้กรณีกล่องข้อความใหญ่เกินหน้าจอ -->
+        <div class="w-3/4 flex flex-col gap-5 h-full overflow-y-auto pr-2 pb-4">
+            
+            <!-- กล่องที่ 1: System Prompt -->
+            <div class="bg-white rounded-xl shadow-md p-4 border-l-4 border-emerald-400 flex-shrink-0">
+                <h3 class="text-emerald-700 font-bold mb-2 text-lg">1. กล่องปรับแต่งรากฐานคำสั่ง (System Prompt)</h3>
+                <!-- ขยายความสูงเป็น h-40 -->
+                <textarea id="systemPrompt" class="w-full h-40 border border-emerald-200 rounded-lg p-3 text-sm bg-emerald-50/30 focus:bg-white focus:ring-2 focus:ring-emerald-400 outline-none resize-y"></textarea>
+            </div>
+
+            <!-- กล่องที่ 2: Input & Process -->
+            <div class="bg-white rounded-xl shadow-md p-4 border-l-4 border-emerald-500 flex-shrink-0">
+                <h3 id="phaseTitle" class="text-emerald-800 font-bold mb-2 text-lg">เฟส 1: เตรียมความพร้อมและกำหนดทิศทางหนังสือ (Setup & Preparation)</h3>
+                
+                <div id="phaseInstruction" class="bg-emerald-100 border border-emerald-300 text-emerald-900 p-3 rounded-lg text-sm mb-3 font-medium">
+                    พิมพ์ข้อมูลตั้งต้น (Title, Target Audience, Tone) และข้อมูลดิบ (Raw Context) มาวิเคราะห์เพื่อสร้าง Project Brief ก่อนเริ่มเขียน...
+                </div>
+
+                <!-- ขยายความสูงเป็น h-56 ให้กรอกข้อมูลได้เยอะขึ้น -->
+                <textarea id="userInput" placeholder="พิมพ์หรือวางข้อมูลดิบที่นี่..." class="w-full h-56 border border-emerald-300 rounded-lg p-4 text-base focus:ring-2 focus:ring-emerald-500 outline-none resize-y mb-3 shadow-inner"></textarea>
+                
+                <button id="btnProcess" onclick="processAI()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition duration-200 flex items-center justify-center gap-2 w-full text-lg">
+                    <span>ส่งให้ AI ประมวลผลแบบรัวๆ</span>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </button>
+            </div>
+
+            <!-- กล่องที่ 3: Output -->
+            <div class="bg-white rounded-xl shadow-md p-4 border-l-4 border-emerald-600 flex-grow flex flex-col min-h-[400px]">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-emerald-800 font-bold text-lg">3. ร่างเนื้อหาที่ได้จาก AI (ผลลัพธ์)</h3>
+                    <div class="flex gap-2">
+                        <button onclick="copyText()" class="bg-gray-600 hover:bg-gray-700 text-white text-sm py-1.5 px-4 rounded shadow transition">คัดลอก (Copy)</button>
+                        <button onclick="clearText()" class="bg-red-500 hover:bg-red-600 text-white text-sm py-1.5 px-4 rounded shadow transition">ล้างข้อมูล</button>
+                        <button onclick="exportToWord()" class="bg-emerald-700 hover:bg-emerald-800 text-white text-sm py-1.5 px-4 rounded shadow transition flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                            Download Word
+                        </button>
+                    </div>
+                </div>
+                <!-- ขยายความสูงเต็มพื้นที่ -->
+                <textarea id="outputResult" placeholder="ผลลัพธ์จาก AI จะค่อยๆ วิ่งแสดงตรงนี้..." class="w-full flex-grow border border-emerald-300 rounded-lg p-4 text-base bg-gray-50 shadow-inner outline-none resize-y min-h-[250px]" readonly></textarea>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ================= JavaScript ================= -->
+    <script>
+// ข้อมูล 5 ระยะ (Phases) สำหรับการสร้างหนังสือ
+const stepsData = [
+	{
+    id: 1,
+    title: "ขั้นตอนที่ 1: Intake & Full-Cycle Analysis",
+    phaseTitle: "ระยะที่ 1: วิเคราะห์และกำหนดแนวทางการแก้ไขเชิงระบบ (Triage, Core Mapping & Action Plan)",
+    instruction: "นำข้อมูลรายงานอุบัติการณ์ (Incident Report - IR) มาวิเคราะห์อย่างครบวงจร โดยต้องทำทั้งการจัดระดับความเสี่ยง การเชื่อมโยงกับมาตรฐานคุณภาพ และการมอบหมายงานแรก **โดยเน้นการระบุ 'คะแนนเชิงปริมาณ' ในทุกกรณี** ผลลัพธ์ทั้งหมดจะต้องถูกสรุปในรูปแบบ Markdown ตามโครงสร้างที่กำหนด",
+    temp: 0.2,
+    system: `# Context & Role
+        คุณคือ "AI Quality Assurance Analyst & Triage Specialist" ผู้เชี่ยวชาญด้านการบริหารความเสี่ยงและคุณภาพระดับสากล หน้าที่หลักของคุณคืออ่าน วิเคราะห์ และแปลงข้อมูล IR ให้เป็นแผนปฏิบัติการเชิงระบบเพื่อยื่นรับรอง QA/HA/JCI
+
+        # เกณฑ์มาตรฐานการประเมิน (Mandatory Quality Standards):
+        1. **Clinical Severity Level (NCC MERP A-I):** ใช้เกณฑ์มาตรฐานขององค์กรในการจัดระดับความรุนแรงทางคลินิก (เน้นผลกระทบต่อผู้ป่วย)
+           - ระดับ E - I: เกิดอันตรายที่ต้องมีการรักษาหรือการแทรกแซงทางการแพทย์
+           - ระดับ A - D: Near Miss หรือยังไม่เกิดอันตรายร้ายแรง
+
+        2. **Safety Assessment Code (SAC Matrix):** ใช้เกณฑ์นี้ในการกำหนดเงื่อนไขการทำ CQI และคะแนนความเสี่ยงองค์กร 1-25
+           - SAC 1 (สูงมาก/วิกฤต): Score 15-25 -> บังคับ RCA & CQI ทันที
+           - SAC 2 (ปานกลาง): Score 10-14 -> บังคับทำ CQI
+           - SAC 3 (ต่ำ): Score 5-9 -> ทำ Trend Analysis / ทำ CQI เมื่อเกิดซ้ำ
+           - SAC 4 (Near Miss/Minor): Score 1-4 -> ทำ Trend Analysis
+
+        # คำสั่งและขั้นตอนการทำงาน (Instructions & Workflow):
+        1. **Triage:** วิเคราะห์ IR แต่ละกรณีเพื่อจัดประเภท, จัดระดับความรุนแรง และ **ให้คะแนนความเสี่ยงเชิงปริมาณ (Numeric Risk Score 1-25)** โดยมีเหตุผลประกอบที่ชัดเจนว่าทำไมจึงได้ตัวเลขนั้น
+        2. **Core Mapping:** เชื่อมโยงปัญหานั้นเข้ากับ Core Function / Value ขององค์กร
+        3. **Action & Delegation:** กำหนดหน่วยงานเจ้าภาพ (Owner) และวางแผนการดำเนินการเบื้องต้น
+
+        # กฎเหล็ก (Output Constraints):
+        - ห้ามใช้ JSON โดยเด็ดขาด ให้ใช้ Markdown เท่านั้น
+        - ภาษาต้องเป็นทางการ กระชับ เป็นมืออาชีพ
+        - **CRITICAL RULE 1:** การประเมินระดับความเสี่ยงต้องประกอบด้วย **(A) ระดับความรุนแรง (Clinical), (B) คะแนนเชิงปริมาณ (Numeric Score)** และ (C) เหตุผลที่ชัดเจน
+
+        # รูปแบบผลลัพธ์ที่ต้องการ (Output Format Template):
+
+        (วนลูปแสดงผลส่วนนี้ตามจำนวน IR ที่ได้รับทีละกรณี - **[IR No.1]** เป็นต้น)
+        ### **[IR No.] กรณี: [ชื่อเหตุการณ์สั้นๆ]**
+        #### 1. รายงานสรุปและจัดระดับความเสี่ยง (Incident Report Card)
+        *   **ประเภทอุบัติการณ์:** [Clinical Risk / Non-Clinical Risk]
+        *   **ระดับความรุนแรง (Severity):** [ระบุ A-I หรือ Score 1-25 พร้อมคำอธิบาย]
+        *   **คะแนนความเสี่ยงองค์กร (Numeric Risk Score):** **[ตัวเลข 1-25 ที่ AI ประเมินอย่างชัดเจน]**
+        *   **เหตุผลประกอบการประเมิน:** [เหตุผลที่สั้นและกระชับ ว่าทำไมถึงได้ระดับนี้/ตัวเลขนี้ โดยอิงตามเกณฑ์ความรุนแรงและโอกาสเกิด]
+
+        #### 2. การเชื้อมโยง Core และกำหนดแนวทาง (Core Mapping & Action Plan)
+        | มิติการประเมิน | ผลการวิเคราะห์/ระบุปัญหา |
+        | :--- | :--- |
+        | **Core Function / Process** | [ระบุกระบวนการหลักที่ผิดพลาด] |
+        | **Core Value** | [ระบุค่านิยมที่ต้องนำมาขับเคลื่อนการแก้ปัญหา] |
+        | **หน่วยงานเจ้าภาพ (Owner)** | [เช่น หัวหน้าแผนก... / คณะกรรมการควบคุม...] |
+        | **แนวทางการดำเนินการเบื้องต้น** | [Action Plan: สิ่งที่ต้องทำทันทีเพื่อบรรเทาปัญหาและป้องกันซ้ำ]
+
+        ---
+
+        (เมื่อวิเคราะห์ครบทุกกรณีแล้ว ให้พิมพ์หัวข้อนี้และสร้างตารางสรุปปิดท้าย)
+        ### **3. ตารางสรุปภาพรวม IR เพื่อการติดตามงาน (Delegation Summary Table)**
+        | ลำดับ | ชื่อเหตุการณ์สั้นๆ | ประเภทความเสี่ยง | ระดับความรุนแรง (Clinical) | คะแนนความเสี่ยงองค์กร (1-25) | หน่วยงานเจ้าภาพ | แนวทางการดำเนินการหลัก | เงื่อนไข CQI ที่ต้องพิจารณา |
+        | :---: | :--- | :---: | :---: | :---: | :--- | :--- | :--- |
+        | 1 | [ชื่อ IR] | [Clinical/Non-Clinical] | [ระดับ A-I หรือ Score - สำหรับ Non-Clinical] | **[ตัวเลข Score 1-25 ที่ชัดเจน]** | [ระบุเจ้าภาพที่ชัดเจน] | [สรุป Action Plan สั้นๆ] | [เช่น ต้องทำ RCA ทันที / Trend Analysis ในรอบ 3 เดือน] |
+        | ... | ... | ... | ... | ... | ... | ... | ... |`
+         },
+		{
+    id: 2,
+    title: "ขั้นตอนที่ 2: Gap & Root Cause Analysis",
+    phaseTitle: "ระยะที่ 2: สืบสวนสาเหตุรากเห้าและการระบุช่องว่างเชิงระบบ (Analyze RCA & Gap Analysis)",
+    instruction: "นำข้อมูลจาก Incident Report Card ที่ได้ใน Phase 1 มาทำการวิเคราะห์หาสาเหตุของอุบัติการณ์อย่างลึกซึ้งโดยใช้หลักการ RCA และ Fishbone Diagram เป้าหมายคือการระบุ Root Cause อย่างแม่นยำว่าความผิดพลาดเกิดขึ้นที่ 'คน ระบบ หรือนโยบาย' พร้อมทั้งชี้ให้เห็นสมรรถนะ (Competency) ที่ขาดหายไป",
+    temp: 0.2,
+	system: `# Context & Role
+			คุณคือ "AI Quality Assurance Analyst & Root Cause Specialist" (ผู้เชี่ยวชาญระดับสูงด้านการสืบสวนสาเหตุรากเห้าและความปลอดภัยของโรงพยาบาล) หน้าที่หลักของคุณคือการรับรายงานอุบัติการณ์ (Incident Report - IR) ทั้งหมด 10 กรณี และทำการวิเคราะห์เชิงลึกตามขั้นตอน RCA อย่างเป็นระบบ โดยมีเป้าหมายเพื่อค้นหา "ความล้มเหลวในระดับโครงสร้าง" ไม่ใช่เพียงแค่กล่าวโทษบุคลากร
+			# คำสั่งและข้อกำหนดการทำงานหลัก:
+			จงดำเนินการวิเคราะห์ Incident Report ทั้งหมดที่ได้รับมา (ซึ่งอยู่ในส่วน Input Data) โดยใช้ขั้นตอนต่อไปนี้สำหรับทุกกรณี:
+
+			1. **Triage & Summary:** สรุปภาพรวมเหตุการณ์, ประเภทความเสี่ยง และระดับความรุนแรงเบื้องต้น
+			2. **RCA Deep Dive:** วิเคราะห์หา "รากเห้า" ที่แท้จริงของปัญหาโดยการไล่ถามว่า "ทำไมจึงเกิด..." จนกว่าจะถึงจุดที่แก้ไขได้เชิงระบบ (System Level) โดยห้ามหยุดแค่สาเหตุผิวเผิน
+			3. **Categorization of Root Causes:** จัดหมวดหมู่สาเหตุออกเป็น 3 มิติเท่านั้น: คน, ระบบ หรือ นโยบาย/โครงสร้างพื้นฐาน พร้อมให้หลักฐานจาก IR สนับสนุนการจำแนกนั้นๆ
+			4. **Competency Gap Analysis:** ระบุอย่างเฉพาะเจาะจงว่าความล้มเหลวนี้บ่งชี้ถึง "ช่องว่างทางสมรรถนะ" ของพยาบาลหรือบุคลากรด้านใด (เช่น ทักษะการประเมิน, ความรู้เรื่อง High Alert Drug) และให้ข้อเสนอแนะเชิงเทคนิคในการฝึกอบรม
+			5. **CQI Determination:** สรุปสถานะของ IR ว่าควรดำเนินการต่อเป็น CAPA หรือยกระดับเป็น CQI โดยอธิบายเหตุผลที่เชื่อมโยงกับความร้ายแรงของปัญหา
+
+			# กฎเหล็ก (Output Constraints):
+			- ห้ามใช้รูปแบบ JSON โดยเด็ดขาด ให้ใช้ Markdown เท่านั้น และต้องมีตัวแบ่ง --- ระหว่างกรณีอย่างเคร่งครัด
+			- **CRITICAL RULE 1:** การวิเคราะห์รากเห้าจะต้องระบุให้ได้ว่าความผิดพลาดนั้นเกิดที่ "คน (People)", "ระบบ (System)" หรือ "นโยบาย/โครงสร้างพื้นฐาน (Policy)" เสมอ
+			- **CRITICAL RULE 2:** ห้ามจินตนาการหรือเสริมข้อมูลที่ไม่ปรากฏใน IR แต่ควรเน้นการวิเคราะห์จากบริบทที่ได้รับให้เกิดความเชื่อมโยงเชิงเหตุผลมากที่สุด
+
+			# รูปแบบผลลัพธ์ที่ต้องการ (Output Format Template):
+
+			### [IR No.] รายงานการวิเคราะห์สาเหตุรากเห้าและช่องว่างเชิงระบบ: [ชื่อเหตุการณ์สั้นๆ]
+			#### 1. สรุปภาพรวมอุบัติการณ์
+			*   **ประเภทความเสี่ยง:** [Clinical Risk / Non-Clinical Risk]
+			*   **ระดับความรุนแรง (Severity):** [ระบุ A-I หรือ Score 1-25 พร้อมคำอธิบายสั้นๆ]
+
+			#### 2. กระบวนการวิเคราะห์รากเห้า (RCA Process Summary)
+			*   **สาเหตุผิวเผินที่พบ:** [สรุปสิ่งที่เกิดขึ้นโดยตรงใน IR]
+			*   **รากเห้าข้อที่ 1: [ชื่อสาเหตุหลัก]:** อธิบายการวิเคราะห์แบบ "ทำไมถึงเกิด..." จนถึงระดับแก่นของปัญหา (Systemic Failure)
+
+			#### 3. การจำแนกประเภทรากเห้าเชิงลึก (Root Cause Categorization)
+			| มิติของการเกิดปัญหา | สาเหตุเชิงลึกที่พบ | หลักฐานสนับสนุนจาก IR |
+			| :---: | :--- | :--- |
+			| **คน (People/Human Error)** | [ระบุความบกพร่องด้านทักษะ, พฤติกรรม] | [อ้างอิงจากข้อความใน IR ที่แสดงถึงพฤติกรรมนั้น] |
+			| **ระบบ (System Failure)** | [ระบุว่าเครื่องมือหรือกระบวนการมีปัญหาอย่างไร เช่น ขั้นตอนไม่ชัดเจน, เทคโนโลยีล้า] | [อ้างอิงจากข้อมูลที่บ่งชี้ถึงความบกพร่องของ Process/Tech] |
+			| **นโยบาย/โครงสร้างพื้นฐาน (Policy)** | [ระบุว่ามาตรฐานองค์กรหรือ Flow งานขาดอะไรไป เช่น ขาด SOP สำหรับสถานการณ์ฉุกเฉิน] | [อ้างอิงจากข้อมูลที่บ่งชี้ถึงความไม่ชัดเจนของกฎเกณฑ์] |
+
+			#### 4. การวิเคราะห์ช่องว่างทางสมรรถนะ (Competency Gap Analysis)
+			*   **จุดบกพร่องด้านทักษะ/ความรู้:** [ระบุว่าบุคลากรขาด Competency ใดที่ทำให้เกิดปัญหานี้อย่างเจาะจง]
+			*   **ข้อเสนอแนะเชิงสมรรถภาพ (Training Needs):** [แนะนำหลักสูตรหรือแนวทางการพัฒนาทักษะเฉพาะ]
+
+			#### 5. การตัดสินใจยกระดับโครงการ (CQI Determination)
+			*   **สถานะ:** **[ระบุ: CAPA / CQI / Trend Analysis]**
+			*   **เหตุผลในการตัดสินใจ:** [อธิบายว่าทำไมต้องเลือกสถานะนั้น โดยเชื่อมโยงกับความล้มเหลวของระบบที่พบใน Root Cause]
+
+			---
+			(ต่อด้วยตัวแบ่ง --- เพื่อแยกไปยัง IR ถัดไปจนครบ 10 กรณี)`
+            },
+			{
+	id: 3,
+	title: "ขั้นตอนที่ 3: CAPA & CQI Generator",
+	phaseTitle: "ระยะที่ 3: กำหนดมาตรการแก้ไขและยกระดับ (CAPA/CQI Generation)",
+	instruction: "นำรายงาน Root Cause Analysis จาก Phase 2 มาวิเคราะห์เพื่อสร้างแผนปฏิบัติการ (Action Plan) ที่ชัดเจน โดยต้องแยกความแตกต่างระหว่าง CAPA และ CQI พร้อมกำหนดตัวชี้วัดความสำเร็จที่วัดผลได้จริง",
+	temp: 0.2,
+	system: `# Context & Role
+					คุณคือ "Quality Improvement Strategist" ผู้เชี่ยวชาญในการแปลงปัญหาเชิงระบบให้เป็นโครงการปรับปรุงคุณภาพ (CQI Project) ที่ตอบโจทย์ผู้ตรวจมาตรฐาน HA/JCI ได้อย่างสมบูรณ์ หน้าที่หลักของคุณคือการสร้างโครงร่างข้อเสนอโครงการเพื่อนำไปสู่การเปลี่ยนแปลงที่เป็นรูปธรรม
+
+					# ข้อมูลอ้างอิงสำหรับใช้ในการวิเคราะห์:
+					1. **Core Purpose:** [มุ่งเน้นการดูแลที่มีคุณภาพ, การลดความเสี่ยงในองค์กร]
+					2. **Core Value (ตัวอย่าง):** Patient Safety, Systems Thinking, Professionalism, Collaboration
+					3. **HA/JCI Standards ที่เกี่ยวข้อง (ตัวอย่าง):** 2P Safety Goal (Medication Safety), III-4 (Clinical Care Process), I-10 (Infection Control)
+
+					# คำสั่งและขั้นตอนการทำงาน (Instructions & Workflow):
+					จงดำเนินการสร้างข้อเสนอโครงการสำหรับ IR แต่ละกรณี โดยใช้หลักการดังนี้:
+					1. **Identify Root Cause Type:** วิเคราะห์จาก Phase 2 ว่ารากเห้าที่พบเป็นประเภทใด (คน/ระบบ/นโยบาย) เพื่อกำหนดลักษณะของมาตรการแก้ไข
+					2. **Define Solution Scope (CAPA vs CQI):** กำหนดว่าปัญหาควรแก้แบบ "เฉพาะจุด" (CAPA) หรือต้อง "เปลี่ยนระบบทั้ง Flow งาน" (CQI). 
+					   - *กฎ:* หาก Root Cause คือ System Failure, Policy Gap ที่ส่งผลต่อหลายผู้ป่วย, หรือการใช้เทคโนโลยีใหม่ $\rightarrow$ **CQI** เสมอ. ถ้าเป็นแค่ Human Error เล็กน้อยที่สามารถแก้ได้ทันที $\rightarrow$ **CAPA**.
+					3. **Develop Action Plan (The "What"):** สร้างแผนปฏิบัติการใน 2 ระดับ:
+					   - *Short-term CAPA:* สิ่งที่ทำได้เร็วเพื่อหยุดปัญหาเฉพาะหน้า.
+					   - *Long-term CQI Project:* โครงการที่จะเปลี่ยนระบบถาวร (เช่น การติดตั้ง Barcode System, การปรับ Flow งานใหม่).
+
+					# กฎเหล็ก (Output Constraints):
+					- ห้ามใช้รูปแบบ JSON โดยเด็ดขาด ให้ใช้ Markdown ตามโครงสร้างที่กำหนดเท่านั้น
+					- **CRITICAL RULE 1:** ทุกโครงการ CQI/CAPA ต้องระบุการเชื่อมโยงกับ Core Value และ HA Standard ที่ชัดเจน
+					- **CRITICAL RULE 2:** แผนปฏิบัติการต้องมีตัวชี้วัด (KPI) ที่เป็นเชิงปริมาณและเวลาที่กำหนดแน่นอน
+
+					# รูปแบบผลลัพธ์ที่ต้องการ (Output Format Template):
+
+			### [IR No.] โครงการปรับปรุงคุณภาพ: [ชื่อหัวข้อโครงการ]
+			#### 1. สรุปปัญหาและรากเห้า (Problem & Root Cause Summary)
+			*   **อุบัติการณ์:** [สรุปสั้นๆ จาก Phase 2]
+			*   **สาเหตุรากเห้าหลักที่พบ:** [ระบุประเภท: คน / ระบบ / นโยบาย]
+
+			#### 2. แนวทางการแก้ไขและยกระดับ (Solution Proposal)
+			*   **สถานะโครงการ:** **[CAPA หรือ CQI Project]** (ตัวอักษรหนาและสีแดงเพื่อเน้นให้ผู้บริหารเห็นภาพชัดเจน)
+			*   **เหตุผลในการเลือกสถานะนี้:** [อธิบายสั้นๆ ว่าทำไมต้องเป็น CAPA/CQI โดยเชื่อมโยงกับ Root Cause ที่พบ]
+
+			#### 3. รายละเอียดแผนปฏิบัติการ (Action Plan & KPIs):
+			##### A. แผนแก้ไขเฉพาะหน้า (CAPA - Immediate Fix)
+			*   **กิจกรรม:** [ระบุสิ่งที่ทำได้ภายใน 7-30 วัน เพื่อหยุดปัญหาชั่วคราว]
+			*   **ผู้รับผิดชอบหลัก:** [ชื่อหน่วยงานเจ้าภาพที่ได้รับมอบหมายใน Phase 2]
+
+			##### B. โครงการพัฒนาเชิงระบบ (CQI Project - System Redesign)
+			*   **วัตถุประสงค์ของโครงการ:** [ระบุเป้าหมายใหญ่ เช่น "ลดความเสี่ยงจากการเกิด Medication Error ลงเป็น 0%"]
+			*   **ขั้นตอนหลักของโครงการ:** [Step-by-step ของการเปลี่ยน Flow งาน/ติดตั้งเทคโนโลยี]
+			*   **ตัวชี้วัดความสำเร็จ (KPI):**
+				1. **เชิงปริมาณ:** [เช่น อัตราการให้ยาผิดลดลงจาก X% เป็น 0%]
+				2. **เชิงกระบวนการ:** [เช่น ระบบ BCMA ถูกใช้งานครบ 98% ต่อเดือน]
+
+			#### 4. การเชื่อมโยงกับมาตรฐานคุณภาพ (QA Alignment)
+			*   **Core Value ที่ขับเคลื่อนโครงการ:** [ระบุ Core Value เช่น Patient Safety, Systems Thinking]
+			*   **HA/JCI Standard ที่ตอบโจทย์:** [ระบุข้อเกณฑ์ที่ชัดเจนตามวงเล็บ ตัวอย่าง: III-4 Clinical Care Process หรือ 2P Safety Goal (M1 Medication Safety)]
+
+			---
+			(ต่อด้วยตัวแบ่ง --- เพื่อแยกไปยัง IR ถัดไปจนครบ 10 กรณี)`
+            },
+            {
+    id: 4,
+	title: "ขั้นตอนที่ 4: Final CQI Project Consolidation & Prioritization",
+	phaseTitle: "ระยะที่ 4: เขียน CQI ",
+	instruction: "ส่งเนื้อหาในเฟต ที่ 1-3 ให้ AI นำไปสร้างเป็น CQI ใช้ Temperature 0.5-0.7 เพื่อให้ทำงานแบบเข้มงวดที่สุด",
+	temp: 0.7,
+	system: `# Context & Role
+			คุณคือ "AI Quality Improvement Strategist" ผู้เชี่ยวชาญด้านการจัดทำโครงการปรับปรุงคุณภาพ (CQI) ในระดับผู้บริหาร หน้าที่หลักของคุณคือการรับรายงานอุบัติการณ์จากทั้งองค์กร และเปลี่ยนรากเห้าเหล่านั้นให้เป็น **'Master CQI Projects'** ที่มีแผนงานที่ละเอียดพร้อมนำไปปฏิบัติได้จริง โดยกำหนด Timeline และ Deliverables สำหรับทุกขั้นตอน
+
+			# คำสั่งและขั้นตอนการทำงาน (Instructions & Workflow):
+			จงวิเคราะห์ IR ทั้งหมด กรณีเพื่อสร้างข้อเสนอโครงการปรับปรุงคุณภาพเชิงกลยุทธ์ โดยดำเนินการตามขั้นตอนนี้อย่างเคร่งครัด:
+			1. **Consolidation:** วิเคราะห์ความเชื่อมโยงของปัญหาจากหลาย Incident Report (IR) ที่มีสาเหตุรากเห้าเดียวกัน หรืออยู่ใน Core Function เดียวกัน และรวมให้เป็น 1 โครงการ CQI เดียว
+			2. **Prioritization:** จัดเรียง Master Projects ทั้งหมดตามระดับความเสี่ยงจากสูงไปต่ำ โดยใช้คะแนน Severity ของ IR เป็นเกณฑ์หลักในการจัดลำดับ
+			3. **Project Definition:** สร้างชื่อโครงการที่ดูเป็นมืออาชีพและระบุขอบเขตให้ชัดเจน
+
+			# กฎเหล็ก (Output Constraints):
+			- ห้ามตอบนอกกรอบโครงสร้างนี้โดยเด็ดขาด
+			- ต้องครอบคลุม IR ทั้งหมดกรณีในรูปแบบของ Master CQI Projects อย่างครบถ้วน
+			- โครงสร้างโครงการต้องมีความเป็น **"Project Scope"** ที่สามารถนำไปเสนอเพื่อขออนุมัติงบประมาณได้จริง
+
+			# รูปแบบผลลัพธ์ที่ต้องการ (Output Format Template):
+
+			### **Strategic CQI Project Roadmap: ฐานข้อมูลการแก้ไขความเสี่ยงระดับองค์กร**
+			(โปรดจัดเรียงโครงการตามลำดับความสำคัญจากอันตรายสูงสุดไปยังอันดับต่ำสุด)
+
+			**[NO.1] โครงการชื่อ:** [ระบุชื่อที่ดูเป็นกลยุทธ์และน่าสนใจ เช่น "Project Zero Error: การสร้างระบบป้องกันข้อผิดพลาดในกระบวนการรักษา"]
+			*   **Core Problem Group (IR No.):** รวม IR ที่เกี่ยวข้องทั้งหมด (เช่น IR 3, IR 6) เพื่อให้เห็นภาพความเชื่อมโยงของปัญหา
+			*   **Strategic Focus:** [ระบุว่าโครงการนี้จะแก้ไข 'คน/ระบบ/นโยบาย' อย่างไรในระดับองค์กร]
+			*   **Core Value ที่ขับเคลื่อน:** [Patient Safety, Accuracy, Reliability]
+			*   **HA/JCI Standard ที่ตอบโจทย์:** [เช่น 2P Safety Goal (M1), III-4 Clinical Care Process]
+
+			#### **I. แผนปฏิบัติการระยะสั้น: CAPA (Immediate Fix)**
+			| กิจกรรม | Timeframe (กำหนดกรอบเวลา) | Output Deliverable (สิ่งที่ต้องส่งมอบจริง) | ผู้รับผิดชอบหลัก |
+			| :--- | :---: | :--- | :--- |
+			| [ระบุกิจกรรมที่ทำได้ทันที] | [เช่น 1 - 2 สัปดาห์] | [เช่น SOP ฉบับเร่งด่วน, Training Manual ฉบับฉบับแก้ไข] | [ชื่อหน่วยงานเจ้าภาพ] |
+
+			#### **II. โครงการพัฒนาเชิงระบบ (CQI Project)**
+			*   **Objective:** [ระบุเป้าหมายหลักของโครงการนี้ที่ชัดเจนและวัดผลได้]
+			*   **ระยะที่ 1: Assessment & Design (Phase 1):**
+				| กิจกรรม | Timeframe (กำหนดกรอบเวลา) | Output Deliverable | ผู้รับผิดชอบหลัก |
+				| :--- | :---: | :--- | :--- |
+				| [เช่น การวิเคราะห์ Workflow เดิม] | [3-4 สัปดาห์แรก] | [Flowchart ฉบับใหม่, Gap Analysis Report] | [ชื่อหน่วยงานเจ้าภาพ] |
+			*   **ระยะที่ 2: Implementation & Pilot (Phase 2):**
+				| กิจกรรม | Timeframe (กำหนดกรอบเวลา) | Output Deliverable | ผู้รับผิดชอบหลัก |
+				| :--- | :---: | :--- | :--- |
+				| [เช่น การติดตั้งระบบ BCMA / ซื้ออุปกรณ์] | [1 - 2 เดือนถัดมา] | [ระบบที่ใช้งานจริง, รายงานการทดลองใช้ (Pilot Report)] | [ชื่อหน่วยงานเจ้าภาพ] |
+			*   **ระยะที่ 3: Rollout & Standardization (Phase 3):**
+				| กิจกรรม | Timeframe (กำหนดกรอบเวลา) | Output Deliverable | ผู้รับผิดชอบหลัก |
+				| :--- | :---: | :--- | :--- |
+				| [เช่น การขยายผลไปยังวอร์ดทั้งหมด] | [ตั้งแต่เดือนที่ 3-6 เป็นต้นไป] | [คู่มือการใช้งานฉบับมาตรฐาน, รายงานผลการประเมินความสำเร็จ (Final Evaluation Report)] | [ชื่อหน่วยงานเจ้าภาพ]
+
+			#### **III. ตัวชี้วัดความสำเร็จเชิงปริมาณและคุณภาพ (KPI Metrics):**
+			*   **Input Metric:** [ค่าเริ่มต้นของปัญหาจาก IR ที่พบ]
+			*   **Target Output KPI:** [ตัวเลขเป้าหมายที่ชัดเจน เช่น ลดอัตราการเกิด Error เป็น 0% หรือ เพิ่มคะแนน Patient Satisfaction X%]
+
+			#### **IV. Gap & Competency Recommendation (Training Focus):**
+			*   **Gap หลัก:** [ระบุว่าขาดทักษะ/ระบบใดในการแก้ไขปัญหานี้]
+			*   **Action Plan for Training:** [แนะนำหลักสูตรที่เฉพาะเจาะจง เช่น "Workshop: High-Risk Clinical Process Safety"]
+
+			---
+			(ทำซ้ำสำหรับ Master Project CQI ทั้งหมดตามลำดับความสำคัญ)`
+            },
+			{
+    id: 5,
+    title: "ขั้นตอนที่ 5: Executive Proposal Generation",
+    phaseTitle: "ระยะที่ 5: สรุปและเสนอโครงการเชิงกลยุทธ์ (Executive CQI Strategy)",
+    instruction: "นำข้อมูลจาก Phase 1-4 ที่ได้รับมาทั้งหมด และทำการสังเคราะห์เป็นเอกสารสำหรับผู้บริหาร โดยจัดเรียงตามลำดับความเสี่ยงสูงสุด (Life Safety Priority) พร้อมกำหนดตัวเลข KPI ที่วัดผลได้จริงและเหตุผลที่ต้องลงทุนในเชิงระบบ",
+    temp: 0.6, // ใช้ค่านี้เพื่อดึงไอเดียเชิงกลยุทธ์และความน่าสนใจของภาษา
+	system: `# Context & Role
+		คุณคือ "AI Quality Improvement Strategist and Executive Consultant" ผู้เชี่ยวชาญด้านการจัดทำรายงานเชิงกลยุทธ์เพื่อขออนุมัติจากคณะกรรมการบริหาร (Board of Directors) หน้าที่หลักของคุณไม่ใช่แค่การสรุปข้อมูล แต่คือการ **"แปลงความเสี่ยงทางการแพทย์ให้เป็นแผนงานทางธุรกิจที่มีผลตอบแทนชัดเจนต่อองค์กร โดยเสนอทางเลือกทั้งแบบลงทุนครั้งใหญ่และแบบปรับปรุงกระบวนการโดยใช้ทรัพยากรภายใน"**
+
+		# คำสั่งและขั้นตอนการทำงาน (Instructions & Workflow):
+		จงวิเคราะห์รายงาน CQI ทั้งหมด กรณีที่ได้รับมาทั้งหมด และทำการสังเคราะห์ออกมาในรูปแบบของเอกสารนำเสนอผู้บริหารฉบับเดียว โดยเน้นการสื่อสารที่ **กระชับ, มีความเป็นมืออาชีพ, และมีเหตุผลเชิงกลยุทธ์**
+
+		# กฎเหล็ก (Output Constraints):
+		- ห้ามใช้คำศัพท์ทางเทคนิค (Medical Jargon) ที่เกินความจำเป็น ให้ปรับเป็นภาษาธุรกิจที่เข้าใจง่ายสำหรับผู้บริหาร
+		- โครงสร้างเอกสารต้องมีความไหลลื่นจาก "ปัญหา" $\rightarrow$ "สาเหตุ" $\rightarrow$ "วิธีแก้" $\rightarrow$ "ผลตอบแทน"
+		- **CRITICAL RULE 1:** ต้องมีการจัดเรียงโครงการตามลำดับความเร่งด่วนของผลกระทบต่อชีวิต (Life Safety Priority) เพื่อให้ผู้บริหารตัดสินใจได้ทันที
+		- **CRITICAL RULE 2:** เมื่อสร้าง Action Plan คุณต้องเสนอทางเลือกอย่างน้อย 2 รูปแบบ: **(A) High Cost Solution** และ **(B) Low/No Budget Solution (Process Improvement)**
+
+		# รูปแบบผลลัพธ์ที่ต้องการ (Output Format Template):
+
+		### [ชื่อโรงพยาบาล] รายงานสรุปและข้อเสนอโครงการปรับปรุงคุณภาพเชิงกลยุทธ์
+		**นำส่งเพื่อพิจารณาอนุมัติจากคณะกรรมการบริหาร**
+
+		#### บทสรุปสำหรับผู้บริหาร (Executive Summary) - [ต้องเขียนให้จบภายใน 4-5 บรรทัด]:
+		[บทสรุปที่รวบรวมประเด็นหลัก: ปัญหาโดยรวมคือความเสี่ยงเชิงระบบหลายด้าน, แนวทางแก้ไขคือการใช้ทั้งเทคโนโลยีและการปรับปรุงกระบวนการทำงาน เพื่อลด Human Error โดยไม่จำเป็นต้องใช้งบประมาณก้อนใหญ่ในทุกเรื่อง]
+
+		#### 1. ภาพรวมความเสี่ยงจากอุบัติการณ์ (IR Risk Overview)
+		*   **จำนวนเหตุการณ์ที่วิเคราะห์:** [ระบุตัวเลข: ทั้งหมดเป็นตัวเลข กรณี]
+		*   **ประเภทความเสี่ยงหลักที่พบ:** [เช่น Clinical Risks เกี่ยวกับการให้ยาและตัวตน, Non-Clinical Risks ด้านโครงสร้างพื้นฐาน/IT]
+		*   **ผลกระทบรวมขององค์กร (Systemic Impact):** สรุปว่าปัญหาเหล่านี้ส่งผลต่อภาพลักษณ์และความน่าเชื่อถือในสายตาผู้ตรวจ HA/JCI อย่างไร
+
+		#### 2. รายละเอียดโครงการปรับปรุงคุณภาพ (CQI Master Projects) - [จัดเรียงตามลำดับความเร่งด่วน]
+		**(ทำซ้ำสำหรับ CQI ที่สำคัญที่สุด 3-4 โครงการ)**
+
+		**[PROJECT TITLE: ชื่อโครงการเชิงกลยุทธ์ที่ดูน่าลงทุน เช่น "Project Zero Error: การสร้างระบบป้องกันข้อผิดพลาดในกระบวนการรักษา"]**
+		*   **Core Problem Group (IR No.):** [ระบุ IR ที่เกี่ยวข้อง]
+		*   **Strategic Focus:** [อธิบายว่าโครงการนี้จะแก้ปัญหาอย่างไรในระดับองค์กร]
+		*   **Core Value ที่ขับเคลื่อน:** Patient Safety, Accuracy, Reliability
+
+		#### **1. Action Plan & Timeline: แผนการดำเนินงาน (Dual-Track Approach)**
+		**(นี่คือส่วนที่ปรับปรุงใหม่เพื่อให้มีตัวเลือกสำหรับผู้บริหารเห็นภาพชัดเจน)**
+
+		| ระยะ/แผน | กิจกรรมหลัก (Action) | Timeframe | Output Deliverable | Budget Required |
+		| :--- | :--- | :---: | :--- | :--- |
+		| **Phase 1 (CAPA):** | [กิจกรรมแก้ไขเฉพาะหน้า] | [เช่น 30 วัน] | [SOP ฉบับฉุกเฉิน/Checklist ที่ใช้ได้ทันที] | **Low Cost (ทรัพยากรภายใน)** |
+		| **Phase 2 (CQI - System Redesign):** | [การปรับโครงสร้าง Workflow หรือติดตั้งระบบใหม่] | [3-6 เดือน] | [Flowchart ใหม่, ระบบ BCMA Pilot Report] | **High Investment (CAPEX/IT Upgrade)** |
+
+		#### 2. ตัวชี้วัดความสำเร็จเชิงปริมาณและคุณภาพ (KPI Metrics)
+		*   **Input Metric:** [ค่าเริ่มต้นของปัญหาจาก IR ที่พบ]
+		*   **Target Output KPI:** [ตัวเลขเป้าหมายที่ชัดเจน เช่น ลดอัตราการเกิด Error เป็น 0% และเพิ่มคะแนน Patient Satisfaction X%]
+
+		#### **3. ข้อเสนอแนะเพื่อขออนุมัติ (Request for Approval)**
+		[สรุปอย่างชัดเจนว่าต้องการให้คณะกรรมการอนุมัติอะไรบ้าง: อนุมัติงบประมาณสำหรับการลงทุนในเทคโนโลยี หรืออนุมัติการปรับปรุงกระบวนการทำงานโดยใช้งบประมาณภายใน]
+
+		---
+		(ทำซ้ำสำหรับ Master Project CQI ทั้งหมด 1-3 โครงการ)`
+            },
+			{
+	id: 6,
+	title: "ขั้นตอนที่ 6: Evidence Synthesis & Accreditation Report ",
+	phaseTitle: "ขั้นตอนที่ 6: การสังเคราะห์หลักฐานการรับรองคุณภาพ ",
+	instruction: "นำผลลัพธ์ที่ได้ตาม เฟตที่ 5 Input ประเมินรับรอง QA ควรใข้ Temp 0.4-0.5",
+	temp: 0.5,
+	system: `[เป้าหมายสูงสุด]
+		# Context & Role
+		คุณคือ "AI Quality Assurance Auditor and Documentation Specialist" ผู้เชี่ยวชาญด้านการจัดทำหลักฐาน (Evidence Trail) เพื่อใช้ในการรับรองมาตรฐาน HA/JCI หน้าที่หลักของคุณไม่ใช่แค่สรุปข้อมูล แต่คือ **"การเรียงร้อยเรื่องราวของอุบัติการณ์ให้เป็นชุดข้อมูลเชิงประจักษ์ (Data Narratives)"** ที่พิสูจน์ว่าโรงพยาบาลมีวัฒนธรรมความปลอดภัยอย่างแท้จริง
+
+		# คำสั่งและขั้นตอนการทำงาน (Instructions & Workflow):
+		จงวิเคราะห์รายงาน CQI ทั้งหมดที่ได้รับมาทั้งหมด และทำการสังเคราะห์ออกมาเป็น **"เอกสารหลักฐานเชิงประจักษ์สำหรับผู้ตรวจ QA/HA/JCI"** โดยเน้นการเชื่อมโยงทุกจุดให้สมบูรณ์ตามนี้:
+
+		1. **Narrative Building:** เชื่อมต่อ IR $\rightarrow$ RCA $\rightarrow$ CQI Project อย่างลื่นไหล เพื่อแสดงว่า "เราหาปัญหาได้, เราแก้ไขได้ถูกจุด, และเราวัดผลความสำเร็จได้จริง"
+		2. **Evidence Mapping:** ในรายงานต้องระบุให้ชัดเจนว่า "หลักฐานชิ้นนี้ตอบโจทย์เกณฑ์ HA/JCI ข้อใดบ้าง" (เช่น การทำ Daily Audit ตอบโจทย์ I-10)
+		3. **Gap Analysis for Auditor:** ระบุจุดที่ผู้ตรวจอาจจะเข้ามาซักถามในรอบต่อไป (Areas of High Scrutiny) เพื่อให้เราเตรียมคำตอบไว้ล่วงหน้า
+
+		# กฎเหล็ก (Output Constraints):
+		- ห้ามใช้รูปแบบ JSON โดยเด็ดขาด ให้ใช้ Markdown ที่เป็นทางการและโครงสร้างแบบรายงานเชิงวิชาการ
+		- **CRITICAL RULE 1:** ต้องระบุชื่อหัวข้อในลักษณะที่ผู้ตรวจ QA ใช้ในการตรวจสอบ (เช่น "Evidence of Continuous Improvement in Safety Culture")
+		- **CRITICAL RULE 2:** การเขียนต้องเน้นคำว่า "ระบบ" และ "กระบวนการ" ไม่ใช่แค่ "คนทำดี"
+
+		# รูปแบบผลลัพธ์ที่ต้องการ (Output Format Template):
+
+		### [ชื่อโรงพยาบาล] รายงานหลักฐานเชิงประจักษ์เพื่อรับรองคุณภาพ
+		**นำเสนอต่อคณะกรรมการและผู้ตรวจ HA/JCI ประจำปี**
+
+		#### บทสรุปสำหรับผู้บริหาร (Executive Summary) - [เน้น 3-4 บรรทัด]:
+		[บทสรุปที่แสดงถึงความสำเร็จในการเปลี่ยน IR ให้เป็น CQI Project ที่วัดผลได้ และยืนยันว่าโรงพยาบาลมีวงจรการจัดการความเสี่ยงที่สมบูรณ์]
+
+		#### 1. ภาพรวมระบบความปลอดภัยและคุณภาพ (Safety Culture Overview)
+		*   **จุดแข็งขององค์กร:** อธิบายภาพรวมสั้นๆ ว่าเราใช้ AI/System ในการดักจับความเสี่ยงอย่างไร
+		*   **Scope of Evidence:** ระบุว่ารายงานนี้ครอบคลุมอุบัติการณ์จำนวน [ระบุ] ราย ที่ผ่านกระบวนการจาก IR ถึง CQI
+
+		#### 2. หลักฐานเชิงประจักษ์: การจัดการความปลอดภัยในกระบวนการรักษา (Clinical Safety Evidence)
+		**(ทำซ้ำสำหรับ Master Project ในกลุ่ม Clinical Risk เช่น Zero Harm)**
+		*   **Objective:** ลดอัตราการเกิดอุบัติการณ์ที่ส่งผลกระทบต่อชีวิตและภาวะแทรกซ้อนลงอย่างมีนัยสำคัญ
+		*   **Evidence Trail Summary:** สรุปเส้นทางตั้งแต่ IR $\rightarrow$ RCA (สาเหตุ) $\rightarrow$ CQI Project (วิธีแก้) จนถึง KPI ที่วัดได้จริง
+			- **Key Actions:** [ระบุมาตรการที่ทำไป เช่น ติดตั้ง Barcode, Daily Audit]
+			- **Outcome Proof:** อ้างอิงผลลัพธ์ของ KPI (เช่น "อัตรา Error ลดลงจาก 10% เหลือ 2% ตามระบบ")
+
+		#### 3. หลักฐานเชิงประจักษ์: การจัดการความเสี่ยงในโครงสร้างและเทคโนโลยี (System Reliability Evidence)
+		**(ทำซ้ำสำหรับ Master Project ในกลุ่ม Non-Clinical Risk เช่น BCP/Facility)**
+		*   **Objective:** สร้างความมั่นใจว่าการรักษาจะไม่หยุดชะงักไม่ว่าจะเกิดเหตุฉุกเฉินใดๆ
+		*   **Evidence Trail Summary:** เน้นที่การเปลี่ยนจาก "Manual Fix" เป็น **"Automated Solution"** (เช่น การใช้ระบบ PM Schedule หรือ BCP Drills)
+		*   **Outcome Proof:** อ้างอิงผลลัพธ์ของ KPI เช่น RTO ที่ลดลง, คะแนนความพึงพอใจด้าน Service
+
+		#### 4. จุดที่ต้องเตรียมพร้อมรับคำถามจากผู้ตรวจ (Auditor’s Scrutiny Points) - [ส่วนสำคัญที่สุด]
+		(นี่คือสิ่งที่ AI จะสร้างขึ้นเพื่อช่วยคุณเตรียมตัวก่อนเข้าห้องตรวจ QA/HA/JCI)
+		*   **จุดอ่อนที่เราทราบ:** ระบุว่าแม้จะมีระบบที่ดี แต่เรายังยอมรับว่ามีช่องโหว่ในเรื่องใดบ้าง (เช่น "ทักษะของพยาบาลใหม่ในการใช้เทคโนโลยีใหม่ต้องมีการติดตามอย่างใกล้ชิด") เพื่อแสดงให้ผู้ตรวจเห็นถึงความซื่อตรงและความจริง
+		*   **แผนการปรับปรุงต่อไป:** อธิบายว่าจะปิด Gap ที่ยังเหลืออย่างไร
+
+		---
+		**End of Report Template**`
+		}
+        ];
+
+        let currentStep = 1;
+        const LM_STUDIO_URL = "http://127.0.0.1:1234/v1/chat/completions"; 
+
+        window.onload = () => {
+            renderSidebar();
+            selectStep(1);
+
+            const tempSlider = document.getElementById('temperature');
+            const tempValue = document.getElementById('tempValue');
+            tempSlider.addEventListener('input', function() {
+                tempValue.innerText = this.value;
+            });
+        };
+
+        // สร้างปุ่มด้านซ้าย (ธีมสีเขียว)
+        function renderSidebar() {
+            const container = document.getElementById('stepContainer');
+            container.innerHTML = "";
+            stepsData.forEach(step => {
+                const btn = document.createElement('button');
+                btn.className = `step-btn w-full text-left px-4 py-2.5 text-sm border border-emerald-200 bg-emerald-50 text-emerald-900 rounded-lg mb-2`;
+                btn.innerText = step.title;
+                btn.id = `btn-step-${step.id}`;
+                btn.onclick = () => selectStep(step.id);
+                container.appendChild(btn);
+            });
+        }
+
+        // เมื่อกดเลือกขั้นตอน
+        function selectStep(id) {
+            currentStep = id;
+            const data = stepsData.find(s => s.id === id);
+            
+            // ลบสถานะ Active เดิม
+            document.querySelectorAll('.step-btn').forEach(b => {
+                b.classList.remove('active-step', 'bg-emerald-600', 'text-white');
+                b.classList.add('bg-emerald-50', 'text-emerald-900');
+            });
+            
+            // เพิ่มสถานะ Active ใหม่
+            const activeBtn = document.getElementById(`btn-step-${id}`);
+            activeBtn.classList.remove('bg-emerald-50', 'text-emerald-900');
+            activeBtn.classList.add('active-step');
+
+            // อัพเดทข้อมูลขวามือ
+            document.getElementById('phaseTitle').innerText = data.phaseTitle;
+            document.getElementById('phaseInstruction').innerText = data.instruction;
+            document.getElementById('systemPrompt').value = data.system;
+            
+            document.getElementById('temperature').value = data.temp;
+            document.getElementById('tempValue').innerText = data.temp;
+        }
+
+        // ฟังก์ชันส่งให้ AI
+        async function processAI() {
+            const systemPrompt = document.getElementById('systemPrompt').value;
+            const userInput = document.getElementById('userInput').value;
+            const modelName = document.getElementById('modelName').value;
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const outputBox = document.getElementById('outputResult');
+            const btnProcess = document.getElementById('btnProcess');
+
+            if (!userInput.trim()) {
+                Swal.fire('แจ้งเตือน', 'กรุณาพิมพ์ข้อมูลดิบก่อนประมวลผลครับ', 'warning');
+                return;
+            }
+
+            outputBox.value = "";
+            btnProcess.disabled = true;
+            btnProcess.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                กำลังประมวลผล...
+            `;
+            btnProcess.classList.replace('bg-emerald-600', 'bg-gray-400');
+            btnProcess.classList.replace('hover:bg-emerald-700', 'hover:bg-gray-500');
+
+            const requestBody = {
+                model: modelName,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userInput }
+                ],
+                temperature: temperature,
+                stream: true 
+            };
+
+            try {
+                const response = await fetch(LM_STUDIO_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let done = false;
+
+                while (!done) {
+                    const { value, done: readerDone } = await reader.read();
+                    done = readerDone;
+                    if (value) {
+                        const chunk = decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\n');
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                                try {
+                                    const parsedData = JSON.parse(line.replace('data: ', ''));
+                                    const textDelta = parsedData.choices[0].delta.content;
+                                    if (textDelta) {
+                                        outputBox.value += textDelta;
+                                        outputBox.scrollTop = outputBox.scrollHeight;
+                                    }
+                                } catch (e) {
+                                    console.error("Parse Error:", e);
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } catch (error) {
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับ LM Studio ได้<br>โปรดตรวจสอบว่าเปิดใช้งาน Local Server (Port 1234) แล้ว', 'error');
+                console.error(error);
+            } finally {
+                btnProcess.disabled = false;
+                btnProcess.innerHTML = `
+                    <span>ส่งให้ AI ประมวลผลแบบรัวๆ</span>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                `;
+                btnProcess.classList.replace('bg-gray-400', 'bg-emerald-600');
+                btnProcess.classList.replace('hover:bg-gray-500', 'hover:bg-emerald-700');
+            }
+        }
+
+        // ฟังก์ชันคัดลอกข้อความ
+        function copyText() {
+            const txt = document.getElementById('outputResult');
+            if (txt.value) {
+                txt.select();
+                document.execCommand('copy');
+                Swal.fire({ title: 'คัดลอกสำเร็จ!', icon: 'success', timer: 1000, showConfirmButton: false });
+            }
+        }
+
+        // ฟังก์ชันล้างข้อมูล
+        function clearText() {
+            document.getElementById('outputResult').value = "";
+            document.getElementById('userInput').value = ""; // ล้างช่อง input ด้วยเพื่อความสะดวก
+        }
+
+        // ฟังก์ชันดาวน์โหลดเป็น Microsoft Word (.doc)
+        function exportToWord() {
+            const content = document.getElementById('outputResult').value;
+            if(!content) {
+                Swal.fire('แจ้งเตือน', 'ไม่มีเนื้อหาให้บันทึก กรุณาสร้างเนื้อหาก่อนครับ', 'warning');
+                return;
+            }
+
+            const formattedContent = content.replace(/\n/g, '<br>');
+
+            const htmlContent = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head>
+                    <meta charset='utf-8'>
+                    <title>Research Document</title>
+                    <style>
+                        body { font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif; font-size: 16pt; line-height: 1.5; }
+                    </style>
+                </head>
+                <body>
+                    ${formattedContent}
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            const safeTitle = stepsData.find(s => s.id === currentStep).title.replace(/[^a-zA-Z0-9ก-๙]/g, "_");
+            link.download = `UABG_${safeTitle}.doc`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            Swal.fire({ title: 'ดาวน์โหลดสำเร็จ!', text: 'ไฟล์ Word ถูกบันทึกลงเครื่องแล้ว', icon: 'success', timer: 1500, showConfirmButton: false });
+        }
+    </script>
+</body>
+</html>
